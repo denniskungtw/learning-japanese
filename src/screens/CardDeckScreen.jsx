@@ -60,8 +60,15 @@ export default function CardDeckScreen() {
 
   function handleKnow() {
     markKnown(deck, card.char);
-    if (safeIndex < cards.length - 1) setIndex(i => i + 1);
-    else setShowSummary(true);
+    if (mode === 'unlearned') {
+      // Card will be removed from filtered list; next card fills this index
+      if (cards.length <= 1) setShowSummary(true);
+      // else: don't increment — removal shifts next card into current position
+    } else {
+      // Review mode: card stays in list, advance normally
+      if (safeIndex < cards.length - 1) setIndex(i => i + 1);
+      else setShowSummary(true);
+    }
   }
 
   function handleDontKnow() {

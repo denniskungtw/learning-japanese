@@ -6,7 +6,7 @@ import { hiragana } from '../data/hiragana';
 import { katakana } from '../data/katakana';
 import { vocabulary } from '../data/vocabulary';
 
-export const APP_VERSION = '1.6';
+export const APP_VERSION = '1.7';
 
 export default function HomeScreen() {
   const { currentUser, currentUserData } = useApp();

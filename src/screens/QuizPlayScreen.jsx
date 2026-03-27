@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { hiragana } from '../data/hiragana';
 import { katakana } from '../data/katakana';
@@ -17,14 +17,38 @@ function shuffle(arr) {
   return a;
 }
 
-function buildMultiChoice() {
-  const pool = shuffle([...hiragana, ...katakana]).slice(0, QUIZ_LENGTH);
+function filterPool(hKnown, kKnown, filter) {
+  if (filter === 'known') {
+    return {
+      h: hiragana.filter(x => hKnown.includes(x.char)),
+      k: katakana.filter(x => kKnown.includes(x.char)),
+    };
+  }
+  if (filter === 'unknown') {
+    return {
+      h: hiragana.filter(x => !hKnown.includes(x.char)),
+      k: katakana.filter(x => !kKnown.includes(x.char)),
+    };
+  }
+  return { h: [...hiragana], k: [...katakana] };
+}
+
+function buildMultiChoice(hKnown, kKnown, filter) {
+  const { h, k } = filterPool(hKnown, kKnown, filter);
+  const pool = shuffle([...h, ...k]).slice(0, QUIZ_LENGTH);
   return pool.map(item => {
-    const distractors = shuffle(
-      [...hiragana, ...katakana].filter(x => x.romaji !== item.romaji)
-    ).slice(0, 3);
+    // De-duplicate distractors by romaji — draw from ALL kana for variety
+    const seenRomaji = new Set([item.romaji]);
+    const distractors = [];
+    for (const x of shuffle([...hiragana, ...katakana])) {
+      if (!seenRomaji.has(x.romaji)) {
+        seenRomaji.add(x.romaji);
+        distractors.push(x);
+        if (distractors.length === 3) break;
+      }
+    }
     const options = shuffle([item, ...distractors]);
-    const deck = hiragana.find(h => h.char === item.char) ? 'hiragana' : 'katakana';
+    const deck = hiragana.find(hh => hh.char === item.char) ? 'hiragana' : 'katakana';
     return {
       type: 'mc',
       question: item.char,
@@ -36,8 +60,17 @@ function buildMultiChoice() {
   });
 }
 
-function buildKanaConvert() {
-  const pairs = hiragana.map((h, i) => ({ h: h.char, k: katakana[i].char }));
+function buildKanaConvert(hKnown, kKnown, filter) {
+  const { h, k } = filterPool(hKnown, kKnown, filter);
+  // Build pairs only from filtered kana that exist in both sets
+  const hChars = new Set(h.map(x => x.romaji));
+  const kChars = new Set(k.map(x => x.romaji));
+  const pairs = hiragana.map((hh, i) => ({ h: hh.char, k: katakana[i].char, romaji: hh.romaji }))
+    .filter(p => {
+      if (filter === 'all') return true;
+      // Include pair if either side matches the filter
+      return hChars.has(p.romaji) || kChars.has(p.romaji);
+    });
   const picked = shuffle(pairs).slice(0, QUIZ_LENGTH);
   return picked.map(p => {
     const dir = Math.random() > 0.5;
@@ -96,11 +129,16 @@ function buildChineseToJp() {
 export default function QuizPlayScreen() {
   const { quizType } = useParams();
   const navigate = useNavigate();
-  const { saveQuizScore, markUnknown } = useApp();
+  const location = useLocation();
+  const { saveQuizScore, markUnknown, currentUserData } = useApp();
+
+  const filter = location.state?.filter || 'all';
+  const hKnown = currentUserData?.hiragana?.known || [];
+  const kKnown = currentUserData?.katakana?.known || [];
 
   const [questions] = useState(() => {
-    if (quizType === 'multiChoice') return buildMultiChoice();
-    if (quizType === 'kanaConvert') return buildKanaConvert();
+    if (quizType === 'multiChoice') return buildMultiChoice(hKnown, kKnown, filter);
+    if (quizType === 'kanaConvert') return buildKanaConvert(hKnown, kKnown, filter);
     if (quizType === 'chineseToJp') return buildChineseToJp();
     return [];
   });
@@ -278,14 +316,14 @@ export default function QuizPlayScreen() {
         {/* MC Options */}
         {q?.type === 'mc' && (
           <div style={styles.optionsGrid}>
-            {q.options.map(opt => {
+            {q.options.map((opt, idx) => {
               let bg = '#fff', borderC = '#ddd', txtC = '#222';
               if (submitted) {
                 if (opt === q.correct) { bg = '#d4edda'; borderC = '#2a9d8f'; txtC = '#2a9d8f'; }
                 else if (opt === selected && opt !== q.correct) { bg = '#fde8e8'; borderC = '#e63946'; txtC = '#e63946'; }
               }
               return (
-                <button key={opt} onClick={() => submitMC(opt)}
+                <button key={idx} onClick={() => submitMC(opt)}
                   style={{ ...styles.optBtn, background: bg, borderColor: borderC, color: txtC }}>
                   {opt}
                 </button>
