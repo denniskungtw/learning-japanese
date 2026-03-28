@@ -6,13 +6,13 @@ import { hiragana } from '../data/hiragana';
 import { katakana } from '../data/katakana';
 
 export default function FlashcardsScreen() {
-  const { currentUser, currentUserData } = useApp();
+  const { displayName, store } = useApp();
   const navigate = useNavigate();
 
-  if (!currentUser) { navigate('/'); return null; }
+  if (!displayName) { navigate('/'); return null; }
 
-  const hiraganaKnown = currentUserData?.hiragana?.known?.length || 0;
-  const katakanaKnown = currentUserData?.katakana?.known?.length || 0;
+  const hiraganaKnown = store?.hiragana?.known?.length || 0;
+  const katakanaKnown = store?.katakana?.known?.length || 0;
 
   return (
     <div style={styles.page}>

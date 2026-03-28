@@ -11,18 +11,19 @@ import KanaChartScreen from './screens/KanaChartScreen';
 import HelpScreen from './screens/HelpScreen';
 
 function AppRoutes() {
-  const { currentUser } = useApp();
+  const { displayName } = useApp();
+  const loggedIn = !!displayName;
   return (
     <Routes>
-      <Route path="/" element={<UserSelectScreen />} />
-      <Route path="/home" element={currentUser ? <HomeScreen /> : <Navigate to="/" />} />
-      <Route path="/flashcards" element={currentUser ? <FlashcardsScreen /> : <Navigate to="/" />} />
-      <Route path="/flashcards/:deck" element={currentUser ? <CardDeckScreen /> : <Navigate to="/" />} />
-      <Route path="/quiz" element={currentUser ? <QuizScreen /> : <Navigate to="/" />} />
-      <Route path="/quiz/:quizType" element={currentUser ? <QuizPlayScreen /> : <Navigate to="/" />} />
-      <Route path="/leaderboard" element={currentUser ? <LeaderboardScreen /> : <Navigate to="/" />} />
-      <Route path="/kana-chart" element={currentUser ? <KanaChartScreen /> : <Navigate to="/" />} />
-      <Route path="/help" element={currentUser ? <HelpScreen /> : <Navigate to="/" />} />
+      <Route path="/" element={loggedIn ? <Navigate to="/home" /> : <UserSelectScreen />} />
+      <Route path="/home" element={loggedIn ? <HomeScreen /> : <Navigate to="/" />} />
+      <Route path="/flashcards" element={loggedIn ? <FlashcardsScreen /> : <Navigate to="/" />} />
+      <Route path="/flashcards/:deck" element={loggedIn ? <CardDeckScreen /> : <Navigate to="/" />} />
+      <Route path="/quiz" element={loggedIn ? <QuizScreen /> : <Navigate to="/" />} />
+      <Route path="/quiz/:quizType" element={loggedIn ? <QuizPlayScreen /> : <Navigate to="/" />} />
+      <Route path="/leaderboard" element={loggedIn ? <LeaderboardScreen /> : <Navigate to="/" />} />
+      <Route path="/kana-chart" element={loggedIn ? <KanaChartScreen /> : <Navigate to="/" />} />
+      <Route path="/help" element={loggedIn ? <HelpScreen /> : <Navigate to="/" />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

@@ -130,11 +130,11 @@ export default function QuizPlayScreen() {
   const { quizType } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { saveQuizScore, markUnknown, currentUserData } = useApp();
+  const { saveQuizScore, markUnknown, store } = useApp();
 
   const filter = location.state?.filter || 'all';
-  const hKnown = currentUserData?.hiragana?.known || [];
-  const kKnown = currentUserData?.katakana?.known || [];
+  const hKnown = store?.hiragana?.known || [];
+  const kKnown = store?.katakana?.known || [];
 
   const [questions] = useState(() => {
     if (quizType === 'multiChoice') return buildMultiChoice(hKnown, kKnown, filter);

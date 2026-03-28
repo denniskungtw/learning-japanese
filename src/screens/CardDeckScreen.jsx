@@ -10,12 +10,12 @@ import { mnemonics } from '../data/mnemonics';
 export default function CardDeckScreen() {
   const { deck } = useParams(); // 'hiragana' or 'katakana'
   const navigate = useNavigate();
-  const { currentUser, currentUserData, markKnown, markUnknown } = useApp();
+  const { displayName, store, markKnown, markUnknown } = useApp();
   const [index, setIndex] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
   const [mode, setMode] = useState('unlearned'); // 'unlearned' | 'all'
 
-  if (!currentUser) { navigate('/'); return null; }
+  if (!displayName) { navigate('/'); return null; }
 
   const data = deck === 'hiragana' ? hiragana : katakana;
   const pairData = deck === 'hiragana' ? katakana : hiragana; // opposite deck for pairing
@@ -23,7 +23,7 @@ export default function CardDeckScreen() {
   const pairName = deck === 'hiragana' ? '片假名' : '平假名';
   const pairColor = deck === 'hiragana' ? '#457b9d' : '#e63946';
   const deckColor = deck === 'hiragana' ? '#e63946' : '#457b9d';
-  const known = currentUserData?.[deck]?.known || [];
+  const known = store?.[deck]?.known || [];
 
   // Only show cards NOT yet learned (or all cards in review mode)
   const cards = mode === 'unlearned'
@@ -84,7 +84,7 @@ export default function CardDeckScreen() {
   }
 
   if (showSummary) {
-    const latestKnown = currentUserData?.[deck]?.known || [];
+    const latestKnown = store?.[deck]?.known || [];
     return (
       <div style={styles.page}>
         <div style={styles.container}>

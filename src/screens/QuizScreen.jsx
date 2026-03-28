@@ -39,14 +39,14 @@ const filterOptions = [
 ];
 
 export default function QuizScreen() {
-  const { currentUser, currentUserData } = useApp();
+  const { displayName, store } = useApp();
   const navigate = useNavigate();
   const [filter, setFilter] = useState('all');
 
-  if (!currentUser) { navigate('/'); return null; }
+  if (!displayName) { navigate('/'); return null; }
 
-  const hKnown = currentUserData?.hiragana?.known || [];
-  const kKnown = currentUserData?.katakana?.known || [];
+  const hKnown = store?.hiragana?.known || [];
+  const kKnown = store?.katakana?.known || [];
   const knownCount = hKnown.length + kKnown.length;
   const unknownCount = (hiragana.length + katakana.length) - knownCount;
 

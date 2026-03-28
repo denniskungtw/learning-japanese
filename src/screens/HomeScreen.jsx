@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import ProgressBar from '../components/ProgressBar';
@@ -5,33 +6,83 @@ import BottomNav from '../components/BottomNav';
 import { hiragana } from '../data/hiragana';
 import { katakana } from '../data/katakana';
 import { vocabulary } from '../data/vocabulary';
+import { mangaCharacters } from '../data/mangaCharacters';
+import { fetchTakenNames } from '../utils/firebase';
 
-export const APP_VERSION = '1.7';
+export const APP_VERSION = '2.0';
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 export default function HomeScreen() {
-  const { currentUser, currentUserData } = useApp();
+  const { displayName, store, setDisplayName, syncToCloud } = useApp();
   const navigate = useNavigate();
 
-  if (!currentUser) { navigate('/'); return null; }
+  // Edit name modal state
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [candidates, setCandidates] = useState([]);
+  const [loadingNames, setLoadingNames] = useState(false);
 
-  const hiraganaKnown = currentUserData?.hiragana?.known?.length || 0;
-  const katakanaKnown = currentUserData?.katakana?.known?.length || 0;
-  const quizScores = currentUserData?.quizScores || [];
+  if (!displayName) { navigate('/'); return null; }
+
+  const hiraganaKnown = store.hiragana?.known?.length || 0;
+  const katakanaKnown = store.katakana?.known?.length || 0;
+  const quizScores = store.quizScores || [];
   const lastQuiz = quizScores[quizScores.length - 1];
+
+  function openEditModal() {
+    setEditName(displayName);
+    setEditing(true);
+    setCandidates([]);
+    // Load candidates from cloud
+    setLoadingNames(true);
+    fetchTakenNames().then(taken => {
+      const takenSet = new Set(taken);
+      const avail = mangaCharacters.filter(n => !takenSet.has(n));
+      setCandidates(shuffle(avail).slice(0, 5));
+      setLoadingNames(false);
+    }).catch(() => {
+      setCandidates(shuffle([...mangaCharacters]).slice(0, 5));
+      setLoadingNames(false);
+    });
+  }
+
+  function confirmEdit(name) {
+    if (!name || !name.trim()) return;
+    setDisplayName(name.trim());
+    setEditing(false);
+  }
+
+  function refreshCandidates() {
+    fetchTakenNames().then(taken => {
+      const takenSet = new Set(taken);
+      const avail = mangaCharacters.filter(n => !takenSet.has(n));
+      setCandidates(shuffle(avail).slice(0, 5));
+    }).catch(() => {
+      setCandidates(shuffle([...mangaCharacters]).slice(0, 5));
+    });
+  }
 
   return (
     <div style={styles.page}>
       <div style={styles.container}>
         {/* Header */}
         <div style={styles.header}>
-          <div>
-            <p style={styles.greeting}>おはよう！</p>
-            <h2 style={styles.userName}>{currentUser}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div>
+              <p style={styles.greeting}>おはよう！</p>
+              <h2 style={styles.userName}>{displayName}</h2>
+            </div>
+            <button onClick={openEditModal} style={styles.editBtn} title="更改名稱">✏️</button>
           </div>
-          <div style={styles.headerRight}>
-            <button onClick={() => navigate('/help')} style={styles.helpBtn} title="使用說明">❓</button>
-            <button onClick={() => navigate('/')} style={styles.switchBtn}>切換帳號</button>
-          </div>
+          <button onClick={() => navigate('/help')} style={styles.helpBtn} title="使用說明">❓</button>
         </div>
 
         {/* Progress Cards */}
@@ -104,6 +155,45 @@ export default function HomeScreen() {
         </div>
       </div>
       <BottomNav />
+
+      {/* Edit Name Modal */}
+      {editing && (
+        <div style={styles.modalOverlay} onClick={() => setEditing(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <h3 style={styles.modalTitle}>更改名稱</h3>
+
+            <div style={styles.modalInputRow}>
+              <input
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && confirmEdit(editName)}
+                style={styles.modalInput}
+                maxLength={20}
+                placeholder="輸入新名稱"
+              />
+              <button onClick={() => confirmEdit(editName)} style={styles.modalGoBtn}>確認</button>
+            </div>
+
+            <p style={styles.modalLabel}>或選擇角色名</p>
+            {loadingNames ? (
+              <p style={styles.modalLoadingText}>載入中...</p>
+            ) : (
+              <>
+                <div style={styles.modalCharGrid}>
+                  {candidates.map(n => (
+                    <button key={n} onClick={() => confirmEdit(n)} style={styles.modalCharBtn}>{n}</button>
+                  ))}
+                </div>
+                {candidates.length > 0 && (
+                  <button onClick={refreshCandidates} style={styles.modalRefreshBtn}>🔄 換一批</button>
+                )}
+              </>
+            )}
+
+            <button onClick={() => setEditing(false)} style={styles.modalCloseBtn}>取消</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -121,15 +211,15 @@ const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
   greeting: { margin: 0, fontSize: 14, color: '#999' },
   userName: { margin: '4px 0 0', fontSize: 24, fontWeight: 800, color: '#222' },
-  headerRight: { display: 'flex', alignItems: 'center', gap: 8 },
+  editBtn: {
+    width: 30, height: 30, borderRadius: '50%', border: '1.5px solid #ddd',
+    background: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex',
+    alignItems: 'center', justifyContent: 'center', padding: 0, marginTop: 4,
+  },
   helpBtn: {
     width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #ddd',
     background: '#fff', fontSize: 16, cursor: 'pointer', display: 'flex',
     alignItems: 'center', justifyContent: 'center', padding: 0,
-  },
-  switchBtn: {
-    padding: '8px 14px', borderRadius: 20, border: '1.5px solid #e63946',
-    background: '#fff', color: '#e63946', fontSize: 13, cursor: 'pointer',
   },
   sectionTitle: { fontSize: 16, fontWeight: 700, color: '#444', margin: '20px 0 10px' },
   card: {
@@ -162,4 +252,41 @@ const styles = {
     display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6,
   },
   versionDot: { color: '#ddd' },
+  // Modal styles
+  modalOverlay: {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
+    justifyContent: 'center', zIndex: 999, padding: 20,
+  },
+  modal: {
+    background: '#fff', borderRadius: 20, padding: '24px 20px',
+    width: '100%', maxWidth: 360, boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+  },
+  modalTitle: { margin: '0 0 16px', fontSize: 18, fontWeight: 800, color: '#222', textAlign: 'center' },
+  modalInputRow: { display: 'flex', gap: 8, marginBottom: 16 },
+  modalInput: {
+    flex: 1, border: '2px solid #e63946', borderRadius: 10, padding: '10px 14px',
+    fontSize: 16, outline: 'none', boxSizing: 'border-box',
+  },
+  modalGoBtn: {
+    padding: '10px 16px', borderRadius: 10, border: 'none',
+    background: '#e63946', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+  },
+  modalLabel: { fontSize: 13, color: '#999', margin: '0 0 10px', textAlign: 'center' },
+  modalLoadingText: { textAlign: 'center', color: '#999', fontSize: 13 },
+  modalCharGrid: { display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 10 },
+  modalCharBtn: {
+    padding: '8px 14px', borderRadius: 10, border: '1.5px solid #e63946',
+    background: '#fff', color: '#e63946', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+  },
+  modalRefreshBtn: {
+    display: 'block', margin: '0 auto 12px', padding: '6px 16px',
+    borderRadius: 16, border: '1px solid #ddd', background: '#f8f8f8',
+    color: '#666', fontSize: 12, cursor: 'pointer',
+  },
+  modalCloseBtn: {
+    width: '100%', padding: '10px 0', borderRadius: 10,
+    border: '1.5px solid #ccc', background: '#fff', color: '#666',
+    fontSize: 14, cursor: 'pointer',
+  },
 };
