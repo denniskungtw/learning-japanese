@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 import { speakSync } from '../utils/speech';
+import { hiragana } from '../data/hiragana';
+import { katakana } from '../data/katakana';
+import { mnemonics } from '../data/mnemonics';
 
 // Standard gojuuon table rows (a-i-u-e-o order)
 const HIRAGANA_TABLE = [
@@ -53,15 +56,34 @@ export default function KanaChartScreen() {
   const navigate = useNavigate();
   const [tab, setTab] = useState('hiragana'); // 'hiragana' | 'katakana'
   const [highlighted, setHighlighted] = useState('');
+  const [modalChar, setModalChar] = useState(null);
 
   const table = tab === 'hiragana' ? HIRAGANA_TABLE : KATAKANA_TABLE;
   const color = tab === 'hiragana' ? '#e63946' : '#457b9d';
 
   function handleCellClick(char, romaji) {
     if (!char) return;
-    setHighlighted(char);
     speakSync(char);
-    setTimeout(() => setHighlighted(''), 600);
+
+    const dataArr = tab === 'hiragana' ? hiragana : katakana;
+    const pairArr = tab === 'hiragana' ? katakana : hiragana;
+    const item = dataArr.find(x => x.char === char);
+    if (!item) return;
+
+    const idx = dataArr.indexOf(item);
+    const pairItem = pairArr[idx];
+    const memo = mnemonics[char];
+
+    setModalChar({
+      char: item.char,
+      romaji: item.romaji,
+      word: item.word,
+      wordRomaji: item.wordRomaji,
+      wordMeaning: item.wordMeaning,
+      pairChar: pairItem?.char || null,
+      mnemonic: memo?.mnemonic || null,
+      kanji: memo?.kanji || null,
+    });
   }
 
   return (
@@ -90,7 +112,7 @@ export default function KanaChartScreen() {
           </button>
         </div>
 
-        <p style={styles.hint}>點擊任一字符可聆聽發音 🔊</p>
+        <p style={styles.hint}>點擊任一字符可查看詳細資訊 📖</p>
 
         {/* Chart */}
         <div style={styles.tableWrap}>
@@ -139,6 +161,62 @@ export default function KanaChartScreen() {
             {tab === 'hiragana' ? '平假名用於日文固有詞彙及語法變化。' : '片假名主要用於外來語及擬聲詞。'}
           </p>
         </div>
+        {/* Flashcard Modal */}
+        {modalChar && (
+          <div style={styles.modalOverlay} onClick={() => setModalChar(null)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              {/* Character */}
+              <div style={{ fontSize: 80, fontWeight: 900, color, textAlign: 'center', lineHeight: 1 }}>
+                {modalChar.char}
+              </div>
+              <div style={{ fontSize: 20, color: '#666', textAlign: 'center', marginTop: 4 }}>
+                {modalChar.romaji}
+              </div>
+
+              {/* Speak */}
+              <button onClick={() => speakSync(modalChar.char)} style={styles.modalSpeakBtn}>
+                🔊 發音
+              </button>
+
+              {/* Example word */}
+              <div style={styles.modalSection}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: '#222' }}>{modalChar.word}</div>
+                <div style={{ fontSize: 14, color: '#888' }}>{modalChar.wordRomaji}</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#444', marginTop: 4 }}>{modalChar.wordMeaning}</div>
+                <button onClick={() => speakSync(modalChar.word)} style={styles.modalMiniSpeaker}>🔊</button>
+              </div>
+
+              {/* Mnemonic */}
+              {modalChar.mnemonic && (
+                <div style={styles.modalMnemonic}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 13, color: '#666' }}>漢字字源：</span>
+                    <span style={{ fontSize: 20, fontWeight: 900, color }}>{modalChar.kanji}</span>
+                  </div>
+                  <p style={{ margin: '6px 0 0', fontSize: 13, color: '#444', lineHeight: 1.6 }}>💡 {modalChar.mnemonic}</p>
+                </div>
+              )}
+
+              {/* Paired kana */}
+              {modalChar.pairChar && (
+                <div style={styles.modalPair}>
+                  <span style={{ fontSize: 13, color: '#888' }}>
+                    對應{tab === 'hiragana' ? '片假名' : '平假名'}：
+                  </span>
+                  <span
+                    style={{ fontSize: 26, fontWeight: 900, color: tab === 'hiragana' ? '#457b9d' : '#e63946', cursor: 'pointer' }}
+                    onClick={() => speakSync(modalChar.pairChar)}
+                  >
+                    {modalChar.pairChar}
+                  </span>
+                </div>
+              )}
+
+              {/* Close */}
+              <button onClick={() => setModalChar(null)} style={styles.modalCloseBtn}>關閉</button>
+            </div>
+          </div>
+        )}
       </div>
       <BottomNav />
     </div>
@@ -170,4 +248,41 @@ const styles = {
   cellActive: { background: '#fff', border: '1px solid #e8e8e8', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' },
   cellEmpty: { background: 'transparent', border: 'none', pointerEvents: 'none' },
   infoBox: { background: '#fff', borderRadius: 12, padding: '14px 16px', marginTop: 12 },
+  modalOverlay: {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
+    justifyContent: 'center', zIndex: 999, padding: 20,
+  },
+  modal: {
+    background: '#fff', borderRadius: 20, padding: '28px 24px',
+    width: '100%', maxWidth: 340, boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+    maxHeight: '85vh', overflowY: 'auto',
+  },
+  modalSpeakBtn: {
+    display: 'block', margin: '12px auto', padding: '8px 24px',
+    borderRadius: 20, border: '1.5px solid #ddd', background: '#f8f8f8',
+    fontSize: 16, cursor: 'pointer',
+  },
+  modalSection: {
+    background: '#f8f8f8', borderRadius: 12, padding: '14px 16px',
+    textAlign: 'center', marginTop: 12, position: 'relative',
+  },
+  modalMiniSpeaker: {
+    position: 'absolute', top: 10, right: 10,
+    background: '#eee', border: 'none', borderRadius: 16,
+    fontSize: 14, cursor: 'pointer', padding: '2px 6px',
+  },
+  modalMnemonic: {
+    background: '#fffbf0', border: '1.5px solid #f4d58d',
+    borderRadius: 12, padding: '12px 14px', marginTop: 12,
+  },
+  modalPair: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    marginTop: 12, justifyContent: 'center',
+  },
+  modalCloseBtn: {
+    width: '100%', marginTop: 16, padding: '12px 0', borderRadius: 12,
+    border: '1.5px solid #ccc', background: '#fff', color: '#666',
+    fontSize: 15, fontWeight: 600, cursor: 'pointer',
+  },
 };

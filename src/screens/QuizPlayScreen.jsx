@@ -8,6 +8,21 @@ import { speak, speakSync, speakDelayed } from '../utils/speech';
 
 const QUIZ_LENGTH = 10;
 
+// Katakana ↔ visually identical Kanji mapping for handwriting IME tolerance
+const LOOKALIKE_MAP = {
+  '工': 'エ', '力': 'カ', '夕': 'タ', '二': 'ニ',
+  '口': 'ロ', '八': 'ハ', '卜': 'ト', '厶': 'ム',
+  '千': 'チ', '十': 'ナ', '匕': 'ヒ', '丁': 'テ',
+  '乃': 'ノ', '也': 'ヤ', '之': 'ノ', '人': 'ヘ',
+  '个': 'ケ', '弋': 'ヌ', '巾': 'リ', '丸': 'マ',
+  // Hiragana lookalikes
+  '巳': 'し', '己': 'こ', '女': 'め',
+};
+
+function normalizeKana(str) {
+  return str.trim().split('').map(c => LOOKALIKE_MAP[c] || c).join('');
+}
+
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -87,7 +102,7 @@ function buildKanaConvert(hKnown, kKnown, filter) {
   });
 }
 
-function buildChineseToJp() {
+function buildVocabMC() {
   // Combine: hiragana words + katakana words + vocabulary list
   const hWords = hiragana.map(h => ({
     chinese: h.wordMeaning,
@@ -114,16 +129,32 @@ function buildChineseToJp() {
     return true;
   });
 
-  return unique.slice(0, QUIZ_LENGTH).map(v => ({
-    type: 'input',
-    question: v.chinese,
-    questionLabel: '中文',
-    answerLabel: '日文',
-    correct: v.japanese,
-    romaji: v.romaji,
-    speakText: null,
-    speakAnswer: v.japanese,
-  }));
+  const picked = unique.slice(0, QUIZ_LENGTH);
+
+  return picked.map(v => {
+    // Build 3 distractors from the pool (different japanese text)
+    const seenJp = new Set([v.japanese]);
+    const distractors = [];
+    for (const w of shuffle(unique)) {
+      if (!seenJp.has(w.japanese)) {
+        seenJp.add(w.japanese);
+        distractors.push(w);
+        if (distractors.length === 3) break;
+      }
+    }
+    const options = shuffle([v, ...distractors]);
+
+    return {
+      type: 'mc',
+      question: v.chinese,
+      questionLabel: '中文',
+      correct: v.japanese,
+      options: options.map(o => o.japanese),
+      romaji: v.romaji,
+      speakText: null,
+      speakAnswer: v.japanese,
+    };
+  });
 }
 
 export default function QuizPlayScreen() {
@@ -139,7 +170,7 @@ export default function QuizPlayScreen() {
   const [questions] = useState(() => {
     if (quizType === 'multiChoice') return buildMultiChoice(hKnown, kKnown, filter);
     if (quizType === 'kanaConvert') return buildKanaConvert(hKnown, kKnown, filter);
-    if (quizType === 'chineseToJp') return buildChineseToJp();
+    if (quizType === 'chineseToJp') return buildVocabMC();
     return [];
   });
 
@@ -185,15 +216,16 @@ export default function QuizPlayScreen() {
       }
     }
     // Speak AFTER answering — still in click handler (user gesture), use speakSync
-    speakSync(q.speakText);
-    setResults(r => [...r, { question: q.question, correct: q.correct, given: opt, ok: correct, speakAnswer: q.speakText }]);
+    if (q.speakText) speakSync(q.speakText);
+    else if (q.speakAnswer) speakSync(q.speakAnswer);
+    setResults(r => [...r, { question: q.question, correct: q.correct, given: opt, ok: correct, speakAnswer: q.speakText || q.speakAnswer }]);
   }
 
   function submitInput() {
     if (submitted) return;
     const ans = inputVal.trim();
     setSubmitted(true);
-    const correct = ans === q.correct;
+    const correct = normalizeKana(ans) === normalizeKana(q.correct);
     if (correct) {
       setScore(s => s + 1);
     } else {
@@ -343,16 +375,16 @@ export default function QuizPlayScreen() {
               disabled={submitted}
               style={{
                 ...styles.inputField,
-                borderColor: submitted ? (inputVal.trim() === q.correct ? '#2a9d8f' : '#e63946') : color,
+                borderColor: submitted ? (normalizeKana(inputVal.trim()) === normalizeKana(q.correct) ? '#2a9d8f' : '#e63946') : color,
               }}
               autoComplete="off"
               inputMode="text"
               lang="ja"
             />
             {submitted && (
-              <div style={{ ...styles.feedback, color: inputVal.trim() === q.correct ? '#2a9d8f' : '#e63946' }}>
+              <div style={{ ...styles.feedback, color: normalizeKana(inputVal.trim()) === normalizeKana(q.correct) ? '#2a9d8f' : '#e63946' }}>
                 <span>
-                  {inputVal.trim() === q.correct
+                  {normalizeKana(inputVal.trim()) === normalizeKana(q.correct)
                     ? '✓ 正確！'
                     : `✗ 正確答案：${q.correct}${q.romaji ? ` (${q.romaji})` : ''}`}
                 </span>
@@ -384,9 +416,9 @@ export default function QuizPlayScreen() {
 }
 
 function quizTypeLabel(type) {
-  if (type === 'multiChoice') return '選擇題';
+  if (type === 'multiChoice') return '發音測驗';
   if (type === 'kanaConvert') return '假名轉換';
-  if (type === 'chineseToJp') return '中文→日文';
+  if (type === 'chineseToJp') return '單字測驗';
   return type;
 }
 

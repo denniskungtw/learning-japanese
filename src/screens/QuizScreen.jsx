@@ -9,7 +9,7 @@ const quizTypes = [
   {
     key: 'multiChoice',
     icon: '🔤',
-    title: '選擇題',
+    title: '發音測驗',
     desc: '看到字符，從四個選項中選出正確的羅馬拼音',
     color: '#e63946',
     supportsFilter: true,
@@ -25,8 +25,8 @@ const quizTypes = [
   {
     key: 'chineseToJp',
     icon: '🈶',
-    title: '中文 → 日文',
-    desc: '看中文字，輸入它的日文平假名寫法',
+    title: '單字測驗',
+    desc: '看中文意思，從四個選項中選出正確的日文寫法',
     color: '#2a9d8f',
     supportsFilter: false,
   },
@@ -108,7 +108,7 @@ export default function QuizScreen() {
 
         <div style={styles.tipBox}>
           <p style={styles.tipText}>
-            💡 <strong>假名轉換</strong>和<strong>中文→日文</strong>需要切換到日文輸入法。
+            💡 <strong>假名轉換</strong>需要切換到日文輸入法。
             在手機上可使用日文手寫輸入。
           </p>
         </div>
