@@ -30,6 +30,14 @@ const quizTypes = [
     color: '#2a9d8f',
     supportsFilter: false,
   },
+  {
+    key: 'confusable',
+    icon: '👀',
+    title: '混淆字',
+    desc: '分辨長得很像的假名，訓練辨識力',
+    color: '#f4a261',
+    supportsFilter: false,
+  },
 ];
 
 const filterOptions = [

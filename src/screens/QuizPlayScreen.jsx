@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { hiragana } from '../data/hiragana';
 import { katakana } from '../data/katakana';
 import { vocabulary } from '../data/vocabulary';
+import { confusables } from '../data/confusables';
 import { speak, speakSync, speakDelayed } from '../utils/speech';
 
 const QUIZ_LENGTH = 10;
@@ -157,6 +158,49 @@ function buildVocabMC() {
   });
 }
 
+function buildConfusable() {
+  // Flatten all confusable groups into individual items with group reference
+  const allItems = [];
+  for (const { group } of confusables) {
+    for (const item of group) {
+      allItems.push({ item, group });
+    }
+  }
+  const picked = shuffle(allItems).slice(0, QUIZ_LENGTH);
+
+  return picked.map(({ item, group }) => {
+    const dir = Math.random() > 0.5;
+
+    if (dir) {
+      // A: show character, pick romaji — do NOT speak before answering (would give it away)
+      const options = shuffle(group.map(g => g.romaji));
+      return {
+        type: 'mc',
+        question: item.char,
+        questionLabel: '這是哪一個？',
+        correct: item.romaji,
+        options,
+        speakText: null,
+        speakAnswer: item.char,
+        deck: item.deck,
+      };
+    } else {
+      // B: show romaji, pick character
+      const options = shuffle(group.map(g => g.char));
+      return {
+        type: 'mc',
+        question: item.romaji,
+        questionLabel: '哪一個是…',
+        correct: item.char,
+        options,
+        speakText: null,
+        speakAnswer: item.char,
+        deck: item.deck,
+      };
+    }
+  });
+}
+
 export default function QuizPlayScreen() {
   const { quizType } = useParams();
   const navigate = useNavigate();
@@ -171,6 +215,7 @@ export default function QuizPlayScreen() {
     if (quizType === 'multiChoice') return buildMultiChoice(hKnown, kKnown, filter);
     if (quizType === 'kanaConvert') return buildKanaConvert(hKnown, kKnown, filter);
     if (quizType === 'chineseToJp') return buildVocabMC();
+    if (quizType === 'confusable') return buildConfusable();
     return [];
   });
 
@@ -315,7 +360,7 @@ export default function QuizPlayScreen() {
     );
   }
 
-  const color = quizType === 'multiChoice' ? '#e63946' : quizType === 'kanaConvert' ? '#457b9d' : '#2a9d8f';
+  const color = quizType === 'multiChoice' ? '#e63946' : quizType === 'kanaConvert' ? '#457b9d' : quizType === 'confusable' ? '#f4a261' : '#2a9d8f';
 
   return (
     <div style={styles.page}>
@@ -338,7 +383,7 @@ export default function QuizPlayScreen() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <div style={styles.questionChar}>{q?.question}</div>
             {/* 🔊 only show for non-MC, or after MC is answered */}
-            {q?.speakText && (quizType !== 'multiChoice' || submitted) && (
+            {q?.speakText && (quizType !== 'multiChoice' && quizType !== 'confusable' || submitted) && (
               <button onClick={() => speakSync(q.speakText)} style={styles.speakBtn} title="發音">🔊</button>
             )}
           </div>
@@ -354,9 +399,10 @@ export default function QuizPlayScreen() {
                 if (opt === q.correct) { bg = '#d4edda'; borderC = '#2a9d8f'; txtC = '#2a9d8f'; }
                 else if (opt === selected && opt !== q.correct) { bg = '#fde8e8'; borderC = '#e63946'; txtC = '#e63946'; }
               }
+              const optFontSize = quizType === 'confusable' && /[\u3040-\u30FF]/.test(opt) ? 28 : 18;
               return (
                 <button key={idx} onClick={() => submitMC(opt)}
-                  style={{ ...styles.optBtn, background: bg, borderColor: borderC, color: txtC }}>
+                  style={{ ...styles.optBtn, background: bg, borderColor: borderC, color: txtC, fontSize: optFontSize }}>
                   {opt}
                 </button>
               );
@@ -419,6 +465,7 @@ function quizTypeLabel(type) {
   if (type === 'multiChoice') return '發音測驗';
   if (type === 'kanaConvert') return '假名轉換';
   if (type === 'chineseToJp') return '單字測驗';
+  if (type === 'confusable') return '混淆字';
   return type;
 }
 
