@@ -20,8 +20,39 @@ const LOOKALIKE_MAP = {
   '巳': 'し', '己': 'こ', '女': 'め',
 };
 
+// Small kana → regular kana
+const SMALL_KANA_MAP = {
+  'ぁ': 'あ', 'ぃ': 'い', 'ぅ': 'う', 'ぇ': 'え', 'ぉ': 'お',
+  'っ': 'つ', 'ゃ': 'や', 'ゅ': 'ゆ', 'ょ': 'よ', 'ゎ': 'わ',
+  'ァ': 'ア', 'ィ': 'イ', 'ゥ': 'ウ', 'ェ': 'エ', 'ォ': 'オ',
+  'ッ': 'ツ', 'ャ': 'ヤ', 'ュ': 'ユ', 'ョ': 'ヨ', 'ヮ': 'ワ',
+};
+
 function normalizeKana(str) {
-  return str.trim().split('').map(c => LOOKALIKE_MAP[c] || c).join('');
+  return str.trim().split('').map(c => {
+    // 1. Kanji lookalikes → katakana
+    if (LOOKALIKE_MAP[c]) c = LOOKALIKE_MAP[c];
+    // 2. Small kana → regular kana
+    if (SMALL_KANA_MAP[c]) c = SMALL_KANA_MAP[c];
+    // 3. Katakana → hiragana (U+30A1-U+30F6 → U+3041-U+3096)
+    const code = c.charCodeAt(0);
+    if (code >= 0x30A1 && code <= 0x30F6) {
+      return String.fromCharCode(code - 0x60);
+    }
+    // 4. Half-width katakana → full-width then to hiragana
+    if (code >= 0xFF66 && code <= 0xFF9D) {
+      const hwMap = 'ヲァィゥェォャュョッーアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユラリルレロワン';
+      const fw = hwMap[code - 0xFF66];
+      if (fw) {
+        const fwCode = fw.charCodeAt(0);
+        if (fwCode >= 0x30A1 && fwCode <= 0x30F6) {
+          return String.fromCharCode(fwCode - 0x60);
+        }
+        return fw;
+      }
+    }
+    return c;
+  }).join('');
 }
 
 function shuffle(arr) {
@@ -103,6 +134,10 @@ function buildKanaConvert(hKnown, kKnown, filter) {
   });
 }
 
+function isKatakanaWord(str) {
+  return /[\u30A0-\u30FF]/.test(str);
+}
+
 function buildVocabMC() {
   // Combine: hiragana words + katakana words + vocabulary list
   const hWords = hiragana.map(h => ({
@@ -133,28 +168,65 @@ function buildVocabMC() {
   const picked = unique.slice(0, QUIZ_LENGTH);
 
   return picked.map(v => {
-    // Build 3 distractors from the pool (different japanese text)
-    const seenJp = new Set([v.japanese]);
-    const distractors = [];
-    for (const w of shuffle(unique)) {
-      if (!seenJp.has(w.japanese)) {
-        seenJp.add(w.japanese);
-        distractors.push(w);
-        if (distractors.length === 3) break;
-      }
-    }
-    const options = shuffle([v, ...distractors]);
+    const dir = Math.random() > 0.5;
 
-    return {
-      type: 'mc',
-      question: v.chinese,
-      questionLabel: '中文',
-      correct: v.japanese,
-      options: options.map(o => o.japanese),
-      romaji: v.romaji,
-      speakText: null,
-      speakAnswer: v.japanese,
-    };
+    if (dir) {
+      // A: 中文→日文 — distractors must be same script (hiragana or katakana)
+      const isKata = isKatakanaWord(v.japanese);
+      const sameScript = unique.filter(w => w.japanese !== v.japanese && isKatakanaWord(w.japanese) === isKata);
+      const seenJp = new Set([v.japanese]);
+      const distractors = [];
+      for (const w of shuffle(sameScript)) {
+        if (!seenJp.has(w.japanese)) {
+          seenJp.add(w.japanese);
+          distractors.push(w);
+          if (distractors.length === 3) break;
+        }
+      }
+      // Fallback: if not enough same-script, fill from any
+      if (distractors.length < 3) {
+        for (const w of shuffle(unique)) {
+          if (!seenJp.has(w.japanese)) {
+            seenJp.add(w.japanese);
+            distractors.push(w);
+            if (distractors.length === 3) break;
+          }
+        }
+      }
+      const options = shuffle([v, ...distractors]);
+      return {
+        type: 'mc',
+        question: v.chinese,
+        questionLabel: '中文',
+        correct: v.japanese,
+        options: options.map(o => o.japanese),
+        romaji: v.romaji,
+        speakText: null,
+        speakAnswer: v.japanese,
+      };
+    } else {
+      // B: 日文→中文
+      const seenCn = new Set([v.chinese]);
+      const distractors = [];
+      for (const w of shuffle(unique)) {
+        if (!seenCn.has(w.chinese)) {
+          seenCn.add(w.chinese);
+          distractors.push(w);
+          if (distractors.length === 3) break;
+        }
+      }
+      const options = shuffle([v, ...distractors]);
+      return {
+        type: 'mc',
+        question: v.japanese,
+        questionLabel: '日文',
+        correct: v.chinese,
+        options: options.map(o => o.chinese),
+        romaji: v.romaji,
+        speakText: v.japanese,
+        speakAnswer: v.japanese,
+      };
+    }
   });
 }
 
@@ -234,7 +306,7 @@ export default function QuizPlayScreen() {
 
   // Auto-speak question ONLY for kanaConvert and chineseToJp (NOT multiChoice)
   useEffect(() => {
-    if (quizType !== 'multiChoice' && q?.speakText) {
+    if (quizType !== 'multiChoice' && quizType !== 'chineseToJp' && quizType !== 'confusable' && q?.speakText) {
       speakDelayed(q.speakText, 350);
     }
   }, [qIndex]);
@@ -383,7 +455,7 @@ export default function QuizPlayScreen() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <div style={styles.questionChar}>{q?.question}</div>
             {/* 🔊 only show for non-MC, or after MC is answered */}
-            {q?.speakText && (quizType !== 'multiChoice' && quizType !== 'confusable' || submitted) && (
+            {q?.speakText && (quizType !== 'multiChoice' && quizType !== 'confusable' && quizType !== 'chineseToJp' || submitted) && (
               <button onClick={() => speakSync(q.speakText)} style={styles.speakBtn} title="發音">🔊</button>
             )}
           </div>

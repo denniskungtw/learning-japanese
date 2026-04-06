@@ -26,7 +26,7 @@ const quizTypes = [
     key: 'chineseToJp',
     icon: '🈶',
     title: '單字測驗',
-    desc: '看中文意思，從四個選項中選出正確的日文寫法',
+    desc: '中日互考：看中文選日文，或看日文選中文',
     color: '#2a9d8f',
     supportsFilter: false,
   },
