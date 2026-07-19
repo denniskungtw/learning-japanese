@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { hiragana } from '../data/hiragana';
 import { katakana } from '../data/katakana';
+import { placeNames } from '../data/placeNames';
 import BottomNav from '../components/BottomNav';
 
 const quizTypes = [
@@ -36,6 +37,14 @@ const quizTypes = [
     title: '混淆字',
     desc: '分辨長得很像的假名，訓練辨識力',
     color: '#f4a261',
+    supportsFilter: false,
+  },
+  {
+    key: 'placeName',
+    icon: '🗾',
+    title: '常見地名',
+    desc: '看漢字選拼音，或看拼音選漢字，學習日本地名讀法',
+    color: '#6b5ce7',
     supportsFilter: false,
   },
 ];

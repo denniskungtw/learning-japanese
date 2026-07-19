@@ -5,6 +5,7 @@ import { hiragana } from '../data/hiragana';
 import { katakana } from '../data/katakana';
 import { vocabulary } from '../data/vocabulary';
 import { confusables } from '../data/confusables';
+import { placeNames } from '../data/placeNames';
 import { speak, speakSync, speakDelayed } from '../utils/speech';
 
 const QUIZ_LENGTH = 10;
@@ -273,6 +274,58 @@ function buildConfusable() {
   });
 }
 
+function buildPlaceName() {
+  const picked = shuffle([...placeNames]).slice(0, QUIZ_LENGTH);
+
+  return picked.map(item => {
+    const dir = Math.random() > 0.5;
+
+    if (dir) {
+      // A: show kanji, pick romaji
+      const seenRomaji = new Set([item.romaji]);
+      const distractors = [];
+      for (const p of shuffle([...placeNames])) {
+        if (!seenRomaji.has(p.romaji)) {
+          seenRomaji.add(p.romaji);
+          distractors.push(p);
+          if (distractors.length === 3) break;
+        }
+      }
+      const options = shuffle([item, ...distractors]);
+      return {
+        type: 'mc',
+        question: item.kanji,
+        questionLabel: '漢字→拼音',
+        correct: item.romaji,
+        options: options.map(o => o.romaji),
+        speakText: null,
+        speakAnswer: item.kana,
+      };
+    } else {
+      // B: show romaji, pick kanji
+      const seenKanji = new Set([item.kanji]);
+      const distractors = [];
+      for (const p of shuffle([...placeNames])) {
+        if (!seenKanji.has(p.kanji)) {
+          seenKanji.add(p.kanji);
+          distractors.push(p);
+          if (distractors.length === 3) break;
+        }
+      }
+      const options = shuffle([item, ...distractors]);
+      return {
+        type: 'mc',
+        question: item.romaji,
+        questionLabel: '拼音→漢字',
+        correct: item.kanji,
+        options: options.map(o => o.kanji),
+        speakText: null,
+        speakAnswer: item.kana,
+      };
+    }
+  });
+}
+
 export default function QuizPlayScreen() {
   const { quizType } = useParams();
   const navigate = useNavigate();
@@ -288,6 +341,7 @@ export default function QuizPlayScreen() {
     if (quizType === 'kanaConvert') return buildKanaConvert(hKnown, kKnown, filter);
     if (quizType === 'chineseToJp') return buildVocabMC();
     if (quizType === 'confusable') return buildConfusable();
+    if (quizType === 'placeName') return buildPlaceName();
     return [];
   });
 
@@ -304,7 +358,7 @@ export default function QuizPlayScreen() {
 
   const q = questions[qIndex];
 
-  // Auto-speak question ONLY for kanaConvert and chineseToJp (NOT multiChoice)
+  // Auto-speak question for kanaConvert and placeName (when showing kana)
   useEffect(() => {
     if (quizType !== 'multiChoice' && quizType !== 'chineseToJp' && quizType !== 'confusable' && q?.speakText) {
       speakDelayed(q.speakText, 350);
@@ -432,7 +486,7 @@ export default function QuizPlayScreen() {
     );
   }
 
-  const color = quizType === 'multiChoice' ? '#e63946' : quizType === 'kanaConvert' ? '#457b9d' : quizType === 'confusable' ? '#f4a261' : '#2a9d8f';
+  const color = quizType === 'multiChoice' ? '#e63946' : quizType === 'kanaConvert' ? '#457b9d' : quizType === 'confusable' ? '#f4a261' : quizType === 'placeName' ? '#6b5ce7' : '#2a9d8f';
 
   return (
     <div style={styles.page}>
@@ -453,7 +507,12 @@ export default function QuizPlayScreen() {
         <div style={styles.questionCard}>
           {q?.questionLabel && <p style={styles.qLabel}>{q.questionLabel}</p>}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-            <div style={styles.questionChar}>{q?.question}</div>
+            <div style={{
+              ...styles.questionChar,
+              ...(q?.question?.length > 14 ? { fontSize: 28 } :
+                  q?.question?.length > 10 ? { fontSize: 36 } :
+                  q?.question?.length > 6 ? { fontSize: 48 } : {}),
+            }}>{q?.question}</div>
             {/* 🔊 only show for non-MC, or after MC is answered */}
             {q?.speakText && (quizType !== 'multiChoice' && quizType !== 'confusable' && quizType !== 'chineseToJp' || submitted) && (
               <button onClick={() => speakSync(q.speakText)} style={styles.speakBtn} title="發音">🔊</button>
@@ -471,7 +530,10 @@ export default function QuizPlayScreen() {
                 if (opt === q.correct) { bg = '#d4edda'; borderC = '#2a9d8f'; txtC = '#2a9d8f'; }
                 else if (opt === selected && opt !== q.correct) { bg = '#fde8e8'; borderC = '#e63946'; txtC = '#e63946'; }
               }
-              const optFontSize = quizType === 'confusable' && /[\u3040-\u30FF]/.test(opt) ? 28 : 18;
+              let optFontSize = 18;
+              if (quizType === 'confusable' && /[\u3040-\u30FF]/.test(opt)) optFontSize = 28;
+              else if (opt.length > 14) optFontSize = 12;
+              else if (opt.length > 10) optFontSize = 14;
               return (
                 <button key={idx} onClick={() => submitMC(opt)}
                   style={{ ...styles.optBtn, background: bg, borderColor: borderC, color: txtC, fontSize: optFontSize }}>
@@ -538,6 +600,7 @@ function quizTypeLabel(type) {
   if (type === 'kanaConvert') return '假名轉換';
   if (type === 'chineseToJp') return '單字測驗';
   if (type === 'confusable') return '混淆字';
+  if (type === 'placeName') return '常見地名';
   return type;
 }
 
