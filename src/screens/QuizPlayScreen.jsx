@@ -6,6 +6,7 @@ import { katakana } from '../data/katakana';
 import { vocabulary } from '../data/vocabulary';
 import { confusables } from '../data/confusables';
 import { placeNames } from '../data/placeNames';
+import { foodMenu } from '../data/foodMenu';
 import { speak, speakSync, speakDelayed } from '../utils/speech';
 
 const QUIZ_LENGTH = 10;
@@ -326,6 +327,58 @@ function buildPlaceName() {
   });
 }
 
+function buildFoodMenu() {
+  const picked = shuffle([...foodMenu]).slice(0, QUIZ_LENGTH);
+
+  return picked.map(item => {
+    const dir = Math.random() > 0.5;
+
+    if (dir) {
+      // A: show japanese, pick chinese
+      const seenCn = new Set([item.chinese]);
+      const distractors = [];
+      for (const f of shuffle([...foodMenu])) {
+        if (!seenCn.has(f.chinese)) {
+          seenCn.add(f.chinese);
+          distractors.push(f);
+          if (distractors.length === 3) break;
+        }
+      }
+      const options = shuffle([item, ...distractors]);
+      return {
+        type: 'mc',
+        question: item.japanese,
+        questionLabel: '日文→中文',
+        correct: item.chinese,
+        options: options.map(o => o.chinese),
+        speakText: item.kana,
+        speakAnswer: item.kana,
+      };
+    } else {
+      // B: show chinese, pick japanese
+      const seenJp = new Set([item.japanese]);
+      const distractors = [];
+      for (const f of shuffle([...foodMenu])) {
+        if (!seenJp.has(f.japanese)) {
+          seenJp.add(f.japanese);
+          distractors.push(f);
+          if (distractors.length === 3) break;
+        }
+      }
+      const options = shuffle([item, ...distractors]);
+      return {
+        type: 'mc',
+        question: item.chinese,
+        questionLabel: '中文→日文',
+        correct: item.japanese,
+        options: options.map(o => o.japanese),
+        speakText: null,
+        speakAnswer: item.kana,
+      };
+    }
+  });
+}
+
 export default function QuizPlayScreen() {
   const { quizType } = useParams();
   const navigate = useNavigate();
@@ -342,6 +395,7 @@ export default function QuizPlayScreen() {
     if (quizType === 'chineseToJp') return buildVocabMC();
     if (quizType === 'confusable') return buildConfusable();
     if (quizType === 'placeName') return buildPlaceName();
+    if (quizType === 'foodMenu') return buildFoodMenu();
     return [];
   });
 
@@ -486,7 +540,7 @@ export default function QuizPlayScreen() {
     );
   }
 
-  const color = quizType === 'multiChoice' ? '#e63946' : quizType === 'kanaConvert' ? '#457b9d' : quizType === 'confusable' ? '#f4a261' : quizType === 'placeName' ? '#6b5ce7' : '#2a9d8f';
+  const color = quizType === 'multiChoice' ? '#e63946' : quizType === 'kanaConvert' ? '#457b9d' : quizType === 'confusable' ? '#f4a261' : quizType === 'placeName' ? '#6b5ce7' : quizType === 'foodMenu' ? '#d4442a' : '#2a9d8f';
 
   return (
     <div style={styles.page}>
@@ -601,6 +655,7 @@ function quizTypeLabel(type) {
   if (type === 'chineseToJp') return '單字測驗';
   if (type === 'confusable') return '混淆字';
   if (type === 'placeName') return '常見地名';
+  if (type === 'foodMenu') return '菜單點餐';
   return type;
 }
 

@@ -9,7 +9,7 @@ import { vocabulary } from '../data/vocabulary';
 import { mangaCharacters } from '../data/mangaCharacters';
 import { fetchTakenNames } from '../utils/firebase';
 
-export const APP_VERSION = '3.0';
+export const APP_VERSION = '3.1';
 
 function shuffle(arr) {
   const a = [...arr];
@@ -204,6 +204,7 @@ function quizTypeLabel(type) {
   if (type === 'chineseToJp') return '單字測驗';
   if (type === 'confusable') return '混淆字';
   if (type === 'placeName') return '常見地名';
+  if (type === 'foodMenu') return '菜單點餐';
   return type;
 }
 

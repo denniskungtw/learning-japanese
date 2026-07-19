@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { hiragana } from '../data/hiragana';
 import { katakana } from '../data/katakana';
 import { placeNames } from '../data/placeNames';
+import { foodMenu } from '../data/foodMenu';
 import BottomNav from '../components/BottomNav';
 
 const quizTypes = [
@@ -45,6 +46,14 @@ const quizTypes = [
     title: '常見地名',
     desc: '看漢字選拼音，或看拼音選漢字，學習日本地名讀法',
     color: '#6b5ce7',
+    supportsFilter: false,
+  },
+  {
+    key: 'foodMenu',
+    icon: '🍣',
+    title: '菜單點餐',
+    desc: '看日文菜名選中文，或看中文選日文，居酒屋壽司丼飯必備',
+    color: '#d4442a',
     supportsFilter: false,
   },
 ];
