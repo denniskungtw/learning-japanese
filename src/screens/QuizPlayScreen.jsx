@@ -327,6 +327,13 @@ function buildPlaceName() {
   });
 }
 
+function pickJpText(item) {
+  // If kanji and kana are the same (e.g. おでん), just return it
+  if (item.japanese === item.kana) return item.japanese;
+  // Randomly show kanji or kana, like a real menu
+  return Math.random() > 0.5 ? item.japanese : item.kana;
+}
+
 function buildFoodMenu() {
   const picked = shuffle([...foodMenu]).slice(0, QUIZ_LENGTH);
 
@@ -334,7 +341,8 @@ function buildFoodMenu() {
     const dir = Math.random() > 0.5;
 
     if (dir) {
-      // A: show japanese, pick chinese
+      // A: show japanese (kanji or kana), pick chinese
+      const jpText = pickJpText(item);
       const seenCn = new Set([item.chinese]);
       const distractors = [];
       for (const f of shuffle([...foodMenu])) {
@@ -347,7 +355,7 @@ function buildFoodMenu() {
       const options = shuffle([item, ...distractors]);
       return {
         type: 'mc',
-        question: item.japanese,
+        question: jpText,
         questionLabel: '日文→中文',
         correct: item.chinese,
         options: options.map(o => o.chinese),
@@ -355,23 +363,25 @@ function buildFoodMenu() {
         speakAnswer: item.kana,
       };
     } else {
-      // B: show chinese, pick japanese
-      const seenJp = new Set([item.japanese]);
+      // B: show chinese, pick japanese (kanji or kana)
+      const jpText = pickJpText(item);
       const distractors = [];
+      const seenJp = new Set([jpText]);
       for (const f of shuffle([...foodMenu])) {
-        if (!seenJp.has(f.japanese)) {
-          seenJp.add(f.japanese);
-          distractors.push(f);
+        const dJp = pickJpText(f);
+        if (!seenJp.has(dJp)) {
+          seenJp.add(dJp);
+          distractors.push(dJp);
           if (distractors.length === 3) break;
         }
       }
-      const options = shuffle([item, ...distractors]);
+      const options = shuffle([jpText, ...distractors]);
       return {
         type: 'mc',
         question: item.chinese,
         questionLabel: '中文→日文',
-        correct: item.japanese,
-        options: options.map(o => o.japanese),
+        correct: jpText,
+        options,
         speakText: null,
         speakAnswer: item.kana,
       };
