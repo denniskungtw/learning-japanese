@@ -327,10 +327,9 @@ function buildPlaceName() {
   });
 }
 
-function pickJpText(item) {
-  // If kanji and kana are the same (e.g. おでん), just return it
+function pickJpText(item, avoidChinese = false) {
   if (item.japanese === item.kana) return item.japanese;
-  // Randomly show kanji or kana, like a real menu
+  if (avoidChinese && item.japanese === item.chinese) return item.kana;
   return Math.random() > 0.5 ? item.japanese : item.kana;
 }
 
@@ -342,7 +341,7 @@ function buildFoodMenu() {
 
     if (dir) {
       // A: show japanese (kanji or kana), pick chinese
-      const jpText = pickJpText(item);
+      const jpText = pickJpText(item, true);
       const seenCn = new Set([item.chinese]);
       const distractors = [];
       for (const f of shuffle([...foodMenu])) {
@@ -364,11 +363,11 @@ function buildFoodMenu() {
       };
     } else {
       // B: show chinese, pick japanese (kanji or kana)
-      const jpText = pickJpText(item);
+      const jpText = pickJpText(item, true);
       const distractors = [];
       const seenJp = new Set([jpText]);
       for (const f of shuffle([...foodMenu])) {
-        const dJp = pickJpText(f);
+        const dJp = pickJpText(f, true);
         if (!seenJp.has(dJp)) {
           seenJp.add(dJp);
           distractors.push(dJp);
